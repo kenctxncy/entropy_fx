@@ -139,14 +139,12 @@ cargo fmt
 ## Принципы разработки
 
 Код следует принципам:
-- **DRY** (Don't Repeat Yourself) - устранение дублирования
-- **KISS** (Keep It Simple, Stupid) - простота реализации
-- **YAGNI** (You Aren't Gonna Need It) - отсутствие избыточного кода
+- **LIPS**
 
 ## Лицензия
 
-[Указать лицензию]
+Genshtab Public License 1.4
 
 ## Автор
 
-[Ваше имя]
+Аланов А. + Оля
