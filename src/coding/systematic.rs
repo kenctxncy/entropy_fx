@@ -40,46 +40,15 @@ pub struct SystematicCode {
     pub p: usize,
 }
 
-/// Compute `n` and `p` from `k` using inequality `2^k <= 2^n / (1+n)`.
+/// Build `k`×`k` identity matrix
 ///
-/// Uses `u128` to avoid overflow for realistic `k` values (e.g., `k = 60`).
+/// # Arguments
 ///
-/// # Panics
+/// * `k` - Size of the identity matrix
 ///
-/// Panics if the algorithm fails to converge for the given `k` value
-/// (i.e., if `n` exceeds 10,000). This should never happen for realistic
-/// lab workload values of `k`.
-#[must_use]
-#[allow(clippy::missing_const_for_fn, clippy::cast_possible_truncation)]
-pub fn compute_n_from_k(k: usize) -> (usize, usize) {
-    let mut n = k;
-    let k_u32 = k as u32;
-
-    loop {
-        let n_u32 = n as u32;
-        // Use u128 to avoid overflow: 2^67 fits in u128 (max is 2^128 - 1)
-        let lhs = 2_u128.pow(k_u32);
-        let rhs = 2_u128.pow(n_u32) / (n as u128 + 1);
-
-        if lhs <= rhs {
-            break;
-        }
-
-        n += 1;
-
-        // Very defensive bound to avoid potential infinite loops in case of
-        // unexpected `k` values. For lab workloads this should never trigger.
-        assert!(
-            n <= 10_000,
-            "compute_n_from_k: failed to converge for k = {k}"
-        );
-    }
-
-    let p = n - k;
-    (n, p)
-}
-
-/// Build k×k identity matrix
+/// # Returns
+///
+/// Identity matrix of size `k` × `k`
 #[must_use]
 pub fn build_identity_matrix(k: usize) -> BinaryMatrix {
     let mut matrix = vec![vec![false; k]; k];
@@ -89,9 +58,19 @@ pub fn build_identity_matrix(k: usize) -> BinaryMatrix {
     matrix
 }
 
-/// Build parity submatrix `H_p` (k rows, p columns)
+/// Build parity submatrix `H_p` (`k` rows, `p` columns)
+///
 /// Uses algorithm from Python: increment binary numbers starting from 3,
 /// skipping those with only one bit set
+///
+/// # Arguments
+///
+/// * `k` - Number of rows
+/// * `p` - Number of columns
+///
+/// # Returns
+///
+/// Parity submatrix `H_p` of size `k` × `p`
 #[must_use]
 pub fn build_parity_submatrix(k: usize, p: usize) -> BinaryMatrix {
     let mut h_p = Vec::with_capacity(k);
@@ -131,6 +110,14 @@ pub fn build_parity_submatrix(k: usize, p: usize) -> BinaryMatrix {
 }
 
 /// Transpose a binary matrix
+///
+/// # Arguments
+///
+/// * `matrix` - Matrix to transpose
+///
+/// # Returns
+///
+/// Transposed matrix
 #[must_use]
 fn transpose_matrix(matrix: &BinaryMatrix) -> BinaryMatrix {
     if matrix.is_empty() {
@@ -150,6 +137,15 @@ fn transpose_matrix(matrix: &BinaryMatrix) -> BinaryMatrix {
 }
 
 /// Build generator matrix P = [`U_k` | `H_p`] and parity check matrix H = [`H_p^T` | `I_p`]
+///
+/// # Arguments
+///
+/// * `k` - Message length (number of information bits)
+/// * `n` - Codeword length (total number of bits)
+///
+/// # Returns
+///
+/// A `SystematicCode` structure with generator and parity check matrices
 #[must_use]
 pub fn build_generator_matrix(k: usize, n: usize) -> SystematicCode {
     let p = n - k;
@@ -189,6 +185,14 @@ pub fn build_generator_matrix(k: usize, n: usize) -> SystematicCode {
 }
 
 /// Build parity check matrix from `H_p`
+///
+/// # Arguments
+///
+/// * `h_p` - Parity submatrix `H_p`
+///
+/// # Returns
+///
+/// Parity check matrix H = [`H_p^T` | `I_p`]
 #[must_use]
 pub fn build_parity_check_from_hp(h_p: &BinaryMatrix) -> BinaryMatrix {
     let p = h_p[0].len();
@@ -206,14 +210,24 @@ pub fn build_parity_check_from_hp(h_p: &BinaryMatrix) -> BinaryMatrix {
 }
 
 /// Encode message using generator matrix or `H_p^T` (as in Python)
+///
 /// Python uses `H_t` (transpose of `H_p`) to compute checksums
+///
+/// # Arguments
+///
+/// * `message` - Message bits to encode
+/// * `code` - Systematic code structure
+///
+/// # Returns
+///
+/// Encoded codeword
 #[must_use]
 pub fn encode_message(message: &Message, code: &SystematicCode) -> Codeword {
     // Extract H_p from generator matrix (last p columns)
     let h_p: BinaryMatrix = code
         .generator
         .iter()
-        .map(|row| row[code.k..].to_vec())
+        .map(|row| Vec::from(&row[code.k..]))
         .collect();
 
     // Transpose H_p to get H_t
@@ -238,6 +252,15 @@ pub fn encode_message(message: &Message, code: &SystematicCode) -> Codeword {
 }
 
 /// Compute syndrome: H * codeword (mod 2)
+///
+/// # Arguments
+///
+/// * `parity_check` - Parity check matrix H
+/// * `codeword` - Received codeword
+///
+/// # Returns
+///
+/// Syndrome vector
 #[must_use]
 pub fn compute_syndrome(parity_check: &BinaryMatrix, codeword: &Codeword) -> Syndrome {
     let mut syndrome = Vec::with_capacity(parity_check.len());
@@ -256,7 +279,17 @@ pub fn compute_syndrome(parity_check: &BinaryMatrix, codeword: &Codeword) -> Syn
 }
 
 /// Correct error in received codeword
-/// Returns corrected codeword and error information
+///
+/// # Arguments
+///
+/// * `parity_check` - Parity check matrix H
+/// * `received` - Received codeword (possibly with errors)
+///
+/// # Returns
+///
+/// A tuple `(corrected, error_info)` where:
+/// - `corrected` is the corrected codeword
+/// - `error_info` contains information about detected/corrected errors
 #[must_use]
 pub fn correct_error(parity_check: &BinaryMatrix, received: &Codeword) -> (Codeword, ErrorInfo) {
     let syndrome = compute_syndrome(parity_check, received);
@@ -288,7 +321,17 @@ pub fn correct_error(parity_check: &BinaryMatrix, received: &Codeword) -> (Codew
 }
 
 /// Inject a single error into codeword with given probability
-/// Returns modified codeword and optional error position
+///
+/// # Arguments
+///
+/// * `codeword` - Original codeword
+/// * `error_probability` - Probability of injecting an error (0.0 to 1.0)
+///
+/// # Returns
+///
+/// A tuple `(modified, error_position)` where:
+/// - `modified` is the codeword with possibly injected error
+/// - `error_position` is `Some(position)` if error was injected, `None` otherwise
 #[must_use]
 pub fn inject_single_error(
     codeword: &Codeword,
@@ -310,6 +353,7 @@ pub fn inject_single_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coding::common::compute_n_from_k;
 
     #[test]
     fn test_compute_n_from_k() {

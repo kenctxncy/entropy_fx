@@ -24,9 +24,20 @@ pub struct HammingCode {
     pub p: usize,
 }
 
-/// Compute n and p from k for Hamming code
-/// For Hamming code: n = 2^p - 1, and we need k <= n - p
-/// We find the smallest p such that 2^p >= k + p + 1
+/// Compute `n` and `p` from `k` for Hamming code
+///
+/// For Hamming code: `n` = 2^`p` - 1, and we need `k` <= `n` - `p`
+/// We find the smallest `p` such that 2^`p` >= `k` + `p` + 1
+///
+/// # Arguments
+///
+/// * `k` - Message length (number of information bits)
+///
+/// # Returns
+///
+/// A tuple `(n, p)` where:
+/// - `n` is the codeword length
+/// - `p` is the number of parity bits
 ///
 /// # Panics
 ///
@@ -51,8 +62,18 @@ pub fn compute_hamming_n_from_k(k: usize) -> (usize, usize) {
 }
 
 /// Encode message using Hamming code
+///
 /// Places parity bits at positions that are powers of 2 (1, 2, 4, 8, ...)
 /// Places information bits at other positions (3, 5, 6, 7, 9, 10, 11, ...)
+///
+/// # Arguments
+///
+/// * `message` - Message bits to encode
+/// * `code` - Hamming code structure
+///
+/// # Returns
+///
+/// Encoded codeword
 #[must_use]
 pub fn encode_hamming(message: &[bool], code: &HammingCode) -> Vec<bool> {
     let mut codeword = vec![false; code.n];
@@ -76,17 +97,37 @@ pub fn encode_hamming(message: &[bool], code: &HammingCode) -> Vec<bool> {
 }
 
 /// Add parity bit for double error detection
+///
 /// This is the overall parity bit (XOR of all bits)
+///
+/// # Arguments
+///
+/// * `codeword` - Codeword to extend
+///
+/// # Returns
+///
+/// Extended codeword with parity bit appended
 #[must_use]
 pub fn add_parity_bit(codeword: &[bool]) -> Vec<bool> {
-    let mut extended = codeword.to_vec();
+    let mut extended = Vec::from(codeword);
     let parity = codeword.iter().fold(false, |acc, &bit| acc ^ bit);
     extended.push(parity);
     extended
 }
 
 /// Compute parity check for a given parity position
+///
 /// XORs all bits whose position has 1 in the i-th bit of binary representation
+///
+/// # Arguments
+///
+/// * `codeword` - Codeword to check
+/// * `parity_pos` - Parity position (power of 2)
+/// * `n` - Codeword length
+///
+/// # Returns
+///
+/// Parity check result
 #[must_use]
 fn compute_parity_check(codeword: &[bool], parity_pos: usize, n: usize) -> bool {
     (1..=n)
@@ -95,7 +136,17 @@ fn compute_parity_check(codeword: &[bool], parity_pos: usize, n: usize) -> bool 
 }
 
 /// Compute syndrome for Hamming code
-/// Returns syndrome vector (p bits) and overall parity check result
+///
+/// # Arguments
+///
+/// * `codeword` - Received codeword
+/// * `code` - Hamming code structure
+///
+/// # Returns
+///
+/// A tuple `(syndrome, overall_parity)` where:
+/// - `syndrome` is the syndrome vector (`p` bits)
+/// - `overall_parity` is the overall parity check result
 #[must_use]
 pub fn compute_syndrome_hamming(codeword: &[bool], code: &HammingCode) -> (Vec<bool>, bool) {
     let syndrome: Vec<bool> = (0..code.p)
@@ -112,6 +163,14 @@ pub fn compute_syndrome_hamming(codeword: &[bool], code: &HammingCode) -> (Vec<b
 }
 
 /// Convert syndrome to error position (read right to left, 1-indexed)
+///
+/// # Arguments
+///
+/// * `syndrome` - Syndrome vector
+///
+/// # Returns
+///
+/// Error position (1-indexed)
 #[must_use]
 fn syndrome_to_position(syndrome: &[bool]) -> usize {
     syndrome
@@ -121,15 +180,35 @@ fn syndrome_to_position(syndrome: &[bool]) -> usize {
 }
 
 /// Correct single error at given position
+///
+/// # Arguments
+///
+/// * `codeword` - Codeword with error
+/// * `position` - Error position (1-indexed)
+///
+/// # Returns
+///
+/// Corrected codeword
 #[must_use]
 fn correct_single_error(codeword: &[bool], position: usize) -> Vec<bool> {
-    let mut corrected = codeword.to_vec();
+    let mut corrected = Vec::from(codeword);
     corrected[position - 1] = !corrected[position - 1];
     corrected
 }
 
 /// Decode Hamming code and detect/correct errors
-/// Returns corrected codeword and error information
+///
+/// # Arguments
+///
+/// * `received` - Received codeword (possibly with errors)
+/// * `code` - Hamming code structure
+/// * `has_parity_bit` - Whether the codeword includes the overall parity bit
+///
+/// # Returns
+///
+/// A tuple `(corrected, error_info)` where:
+/// - `corrected` is the corrected codeword
+/// - `error_info` contains information about detected/corrected errors
 #[must_use]
 pub fn decode_hamming(
     received: &[bool],
@@ -160,12 +239,12 @@ pub fn decode_hamming(
 
     // Handle no errors case
     if all_zero && (!has_parity_bit || overall_parity) {
-        return (codeword_part.to_vec(), HammingErrorInfo::NoError);
+        return (Vec::from(codeword_part), HammingErrorInfo::NoError);
     }
 
     // Handle double error detection (only for modified Hamming code)
     if has_parity_bit && !all_zero && overall_parity {
-        return (codeword_part.to_vec(), HammingErrorInfo::DoubleError);
+        return (Vec::from(codeword_part), HammingErrorInfo::DoubleError);
     }
 
     // Try to correct single error
@@ -180,14 +259,24 @@ pub fn decode_hamming(
     }
 
     // Uncorrectable error
-    (codeword_part.to_vec(), HammingErrorInfo::DoubleError)
+    (Vec::from(codeword_part), HammingErrorInfo::DoubleError)
 }
 
 /// Inject errors with given multiplicity (0, 1, or 2)
-/// Returns modified codeword and list of error positions (1-indexed)
+///
+/// # Arguments
+///
+/// * `codeword` - Original codeword
+/// * `error_multiplicity` - Number of errors to inject (0, 1, or 2)
+///
+/// # Returns
+///
+/// A tuple `(modified, error_positions)` where:
+/// - `modified` is the codeword with injected errors
+/// - `error_positions` is a list of error positions (1-indexed)
 #[must_use]
 pub fn inject_errors(codeword: &[bool], error_multiplicity: usize) -> (Vec<bool>, Vec<usize>) {
-    let mut modified = codeword.to_vec();
+    let mut modified = Vec::from(codeword);
     let mut error_positions = Vec::new();
     let mut rng = rand::rng();
 
@@ -210,6 +299,10 @@ pub fn inject_errors(codeword: &[bool], error_multiplicity: usize) -> (Vec<bool>
 }
 
 /// Generate random error multiplicity (0, 1, or 2)
+///
+/// # Returns
+///
+/// Random error multiplicity: 0, 1, or 2
 #[must_use]
 pub fn generate_error_multiplicity() -> usize {
     let mut rng = rand::rng();
@@ -217,6 +310,14 @@ pub fn generate_error_multiplicity() -> usize {
 }
 
 /// Check if a number is a power of two
+///
+/// # Arguments
+///
+/// * `n` - Number to check
+///
+/// # Returns
+///
+/// `true` if `n` is a power of two, `false` otherwise
 #[must_use]
 const fn is_power_of_two(n: usize) -> bool {
     n > 0 && n.is_power_of_two()
