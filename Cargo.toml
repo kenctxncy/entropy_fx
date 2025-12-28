@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Библиотека для расчета энтропии и кодирования информации (коды Хемминга, циклические, систематические)"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/theory-of-information-and-encoding"
+repository = "https://github.com/kenctxncy/theory-of-information-and-encoding"
 keywords = ["entropy", "information-theory", "error-correction", "hamming-code", "cyclic-code"]
 categories = ["algorithms", "science"]
 
